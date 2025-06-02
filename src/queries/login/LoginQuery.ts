@@ -18,7 +18,7 @@ interface LoginError {
 
 export async function useLoginMutation({ username, password }: LoginQueryProps): Promise<LoginResponse> {
     try {
-        const { data } = await api.post<LoginResponse>('/login', { username, password });
+        const { data } = await api.post<LoginResponse>('/auth/login', { username, password });
         return data;
     } catch (error) {
         if (error instanceof AxiosError) {

@@ -1,30 +1,26 @@
-"use client";
- 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
+import SettingsModal from "@/components/set-settings-modal/settingsModal";
  
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { useDataTable } from "@/hooks/use-data-table";
  
 import type { Column, ColumnDef } from "@tanstack/react-table";
 import {
-  MoreHorizontal,
+  Cable,
+  LogOut,
+  ShieldUser,
   SmileIcon,
   SmilePlus,
   StarHalf,
   Text,
 } from "lucide-react";
-import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs";
+import { useNavigate } from "react-router";
 import * as React from "react";
+import { useState } from "react";
+import { BreadcrumbModal } from "@/components/breadcrumb-modal/breadcrumbModal";
  
 interface Project {
   id: string;
@@ -58,55 +54,51 @@ const data: Project[] = [
     interaction: "comment",
     platform: "facebook"
   },
+  {
+    id: "5",
+    name: "Sarah Johnson",
+    interaction: "like",
+    platform: "youtube"
+  },
+  {
+    id: "6",
+    name: "Michael Brown",
+    interaction: "share",
+    platform: "twitter"
+  },
+  {
+    id: "7",
+    name: "Emily Davis",
+    interaction: "comment",
+    platform: "youtube"
+  },
+  {
+    id: "8",
+    name: "David Wilson",
+    interaction: "like",
+    platform: "facebook"
+  },
+  {
+    id: "9",
+    name: "Lisa Anderson",
+    interaction: "share",
+    platform: "youtube"
+  },
+  {
+    id: "10",
+    name: "James Taylor",
+    interaction: "comment",
+    platform: "twitter"
+  }
 ];
  
 export default function Home() {
-  const [title] = useQueryState("title", parseAsString.withDefault(""));
-  const [status] = useQueryState(
-    "status",
-    parseAsArrayOf(parseAsString).withDefault([]),
-  );
+  const [connectionInfo, setConnectionInfo] = useState<boolean>(false);
+  const navigate = useNavigate();
  
-  // Ideally we would filter the data server-side, but for the sake of this example, we'll filter the data client-side
-  const filteredData = React.useMemo(() => {
-    return data.filter((project) => {
-      const matchesTitle =
-        title === "" ||
-        project.name.toLowerCase().includes(title.toLowerCase());
-      const matchesStatus =
-        status.length === 0 || status.includes(project.platform);
- 
-      return matchesTitle && matchesStatus;
-    });
-  }, [title, status]);
- 
+
   const columns = React.useMemo<ColumnDef<Project>[]>(
     () => [
-      {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && "indeterminate")
-            }
-            onCheckedChange={(value) =>
-              table.toggleAllPageRowsSelected(!!value)
-            }
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        size: 32,
-        enableSorting: false,
-        enableHiding: false,
-      },
       {
         id: "name",
         accessorKey: "name",
@@ -167,49 +159,48 @@ export default function Home() {
           );
         },
       },
-      {
-        id: "actions",
-        cell: function Cell() {
-          return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem>Edit</DropdownMenuItem>
-                <DropdownMenuItem variant="destructive">
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          );
-        },
-        size: 32,
-      },
     ],
     [],
   );
  
   const { table } = useDataTable({
-    data: filteredData,
+    data: data,
     columns,
     pageCount: 1,
-    initialState: {
-      sorting: [{ id: "name", desc: true }],
-      columnPinning: { right: ["actions"] },
-    },
+    
     getRowId: (row) => row.id,
   });
+
+  const handleConnect = () => {
+    
+  }
  
   return (
     <main className="p-10">
+
+      <div className="flex flex-col md:flex-row justify-between  p-4 gap-4">
+        <div className="flex flex-col gap-2">
+            <Button onClick={() => navigate("/admin")}><ShieldUser className="w-4 h-4" /></Button>
+            <Button><LogOut className="w-4 h-4" /></Button>
+        </div>
+        <div className="flex flex-col gap-2">
+            <BreadcrumbModal path={[]} />
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-gray-500">This is the home page</p>
+        </div>
+
+        <div className="flex flex-col gap-2 ml-auto w-fit bg-gray-100 rounded-md p-4 ">
+          <p className="flex items-center gap-2">connection info : <Cable className={`w-4 h-4 ${connectionInfo ? "text-green-500" : "text-red-500"}`} /> </p>
+          <p>video id : <span className="font-bold">1234567890</span></p>
+          <p>streamlabs id : <span className="font-bold">1234567890</span></p>
+          {
+            connectionInfo ? <Button className="bg-red-500 text-white px-4 py-2 rounded-md">disconnect</Button> : <SettingsModal />
+          }
+        </div>
+      </div>
+
         <div className="data-table-container">
-            <DataTable table={table}>
-                <DataTableToolbar table={table} />
-            </DataTable>
+            <DataTable table={table}/>
         </div>
     </main>
   );
