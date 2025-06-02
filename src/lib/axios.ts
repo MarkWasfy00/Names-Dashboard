@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { auth } from './auth';
+import { server } from './server';
 
-const api = axios.create({
-    baseURL: 'http://92.205.236.219:5050/api',
+export const api = axios.create({
+    baseURL: server.baseUrl,
     headers: {
         'Content-Type': 'application/json',
     },
@@ -27,10 +28,10 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Handle unauthorized access
+            // Remove token from storage
             auth.removeToken();
-            // Instead of forcing a page refresh, we'll just reject the promise
-            // The component can handle the navigation
+            // Redirect to login page
+            window.location.href = '/login';
         }
         return Promise.reject(error);
     }

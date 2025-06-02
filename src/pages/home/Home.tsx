@@ -17,29 +17,33 @@ import {
   StarHalf,
   Text,
 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import * as React from "react";
 import { useEffect, useState, useCallback } from "react";
 import { BreadcrumbModal } from "@/components/breadcrumb-modal/breadcrumbModal";
 import { auth } from "@/lib/auth";
 import * as signalR from "@microsoft/signalr";
 import { server } from "@/lib/server";
-
-
-type Watcher = {
-  id: string;
-  username: string;
-  platform: string;
-  interaction: string;
-}
- 
+import { getWatchersQuery, type Watcher } from "@/queries/watchers/WatcherQuery";
+import { useQuery } from "@tanstack/react-query";
 
 export default function Home() {
   const [connectionInfo, setConnectionInfo] = useState<boolean>(false);
-  const [watchers, setWatchers] = useState<Watcher[]>([]);
   const [lastAddedWatcher, setLastAddedWatcher] = useState<Watcher | null>(null);
-  const [currentUsers, setCurrentUsers] = useState<number>(0);
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
+  const [currentUsers, setCurrentUsers] = useState<number>(0);
+  
+  const [searchParams] = useSearchParams();
+  const page = Number(searchParams.get('page')) || 1;
+  const pageSize = Number(searchParams.get('perPage')) || 10;
+  const search = searchParams.get('search') || "";
+
+  const [message, setMessage] = useState<{ videoId: string, token: string } | null>(null);
+
+
+
+
+  const { data: watchersData } = useQuery(getWatchersQuery({ page, pageSize, prefix: "", sortBy: "" }));
 
   const navigate = useNavigate();
 
@@ -125,12 +129,51 @@ export default function Home() {
   );
  
   const { table } = useDataTable({
-    data: watchers,
+    data: watchersData?.data || [],
     columns,
-    pageCount: 1,
-    
+    pageCount: watchersData?.totalPages || 1,
     getRowId: (row) => row.id,
+    initialState: {
+      pagination: {
+        pageIndex: Number(page) - 1,
+        pageSize: Number(pageSize),
+      },
+      columnFilters: [
+        { id: "username", value: search },
+      ],
+    },
+    history: "replace",
+    shallow: true,
   });
+  const tablePagination = table.getState().pagination;
+  const tableColumnFilters = table.getState().columnFilters;
+ 
+
+  useEffect(() => {
+    const { pageIndex, pageSize } = table.getState().pagination;
+    const { columnFilters } = table.getState();
+    const usernameFilter = columnFilters.find(filter => filter.id === "username");
+    const searchValue = usernameFilter?.value as string || "";
+  
+    // Avoid re-setting the same params unnecessarily
+    const currentPage = Number(searchParams.get("page")) || 1;
+    const currentPerPage = Number(searchParams.get("perPage")) || 10;
+    const currentSearch = searchParams.get("search") || "";
+  
+    if (currentPage !== pageIndex + 1 || currentPerPage !== pageSize || currentSearch !== searchValue) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set("page", String(pageIndex + 1));
+      newParams.set("perPage", String(pageSize));
+      if (searchValue) {
+        newParams.set("search", searchValue);
+      } else {
+        newParams.delete("search");
+      }
+      navigate({ search: newParams.toString() }, { replace: true });
+    }
+  
+  }, [tablePagination, tableColumnFilters, navigate, searchParams, table]);
+  
 
   useEffect(() => {
     const newConnection = new signalR.HubConnectionBuilder()
@@ -156,9 +199,13 @@ export default function Home() {
     startConnection();
 
     newConnection.on("UpdateWatchers", (watchers: Watcher[]) => {
-      setWatchers(watchers);
       setLastAddedWatcher(watchers[watchers.length - 1] || null);
       setCurrentUsers(watchers.length);
+    });
+
+    newConnection.on("StreamlabsTokenUpdated", (data: { message: { token: string, videoId: string } }) => {
+      console.log(data);
+      setMessage(data.message);
     });
 
     newConnection.onreconnecting(() => {
@@ -180,7 +227,12 @@ export default function Home() {
       }
     };
   }, []);
-  
+
+
+  useEffect(() => {
+    setCurrentUsers(watchersData?.totalItems || 0);
+  }, [watchersData])
+
   return (
     <main className="p-10">
 
@@ -198,11 +250,13 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col gap-2 ml-auto w-fit rounded-md p-4 ">
-          <p>video id : <span className="font-bold">1234567890</span></p>
-          <p>streamlabs id : <span className="font-bold">1234567890</span></p>
-          {
-            connectionInfo ? <Button className="bg-red-500 text-white px-4 py-2 rounded-md">disconnect</Button> : <SettingsModal />
-          }
+          <p>video id : <span className="font-bold">{message?.videoId || "not set"}</span></p>
+          <p>streamlabs id : <span className="font-bold">{message?.token || "not set"}</span></p>
+          {/* {
+            connectionInfo ? <Button className="bg-red-500 text-white px-4 py-2 rounded-md">disconnect</Button> : <SettingsModal onSetVideoId={handleSetVideoId} />
+          } */}
+          <SettingsModal onSetVideoId={handleSetVideoId} />
+          <Button variant="destructive" onClick={() => handleSetVideoId("0", "0")}>turn off listener</Button>
         </div>
       </div>
 
@@ -210,7 +264,7 @@ export default function Home() {
             <DataTable table={table}/>
         </div>
 
-        <Button onClick={() => handleSetVideoId("jfKfPfyJRdk", "11")}>set video id</Button>
+        
     </main>
   );
 }

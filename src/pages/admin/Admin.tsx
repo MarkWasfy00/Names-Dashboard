@@ -4,7 +4,6 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,103 +14,61 @@ import { useDataTable } from "@/hooks/use-data-table";
  
 import type { Column, ColumnDef } from "@tanstack/react-table";
 import {
-  Link,
   LinkIcon,
   MoreHorizontal,
   SmileIcon,
   SmilePlus,
-  StarHalf,
   Text,
 } from "lucide-react";
 import * as React from "react";
-import { parseAsArrayOf, parseAsString, useQueryState } from "nuqs";
+import { useSearchParams, useNavigate } from "react-router";
 import { BreadcrumbModal } from "@/components/breadcrumb-modal/breadcrumbModal";
+import { getWatchersQuery, deleteWatcherMutation, type Watcher } from "@/queries/watchers/WatcherQuery";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { server } from "@/lib/server";
+import { toast } from "sonner";
 
-interface Project {
-  id: string;
-  name: string;
-  interaction: string;
-  platform: string;
-}
- 
-const data: Project[] = [
-  {
-    id: "1",
-    name: "Mark Wasfy",
-    interaction: "like",
-    platform: "youtube"
-  },
-  {
-    id: "2",
-    name: "John Doe",
-    interaction: "comment",
-    platform: "facebook"
-  },
-  {
-    id: "3",
-    name: "Jane Smith",
-    interaction: "share",
-    platform: "twitter"
-  },
-  {
-    id: "4",
-    name: "Omar Abdelghany",
-    interaction: "comment",
-    platform: "facebook"
-  },
-];
- 
- 
 const Admin = () => {
-  const [title] = useQueryState("title", parseAsString.withDefault(""));
-  const [status] = useQueryState("status", parseAsArrayOf(parseAsString).withDefault([]),);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  const filteredData = React.useMemo(() => {
-    return data.filter((project) => {
-      const matchesTitle =
-        title === "" ||
-        project.name.toLowerCase().includes(title.toLowerCase());
-      const matchesStatus =
-        status.length === 0 || status.includes(project.platform);
- 
-      return matchesTitle && matchesStatus;
-    });
-  }, [title, status]);
- 
-  const columns = React.useMemo<ColumnDef<Project>[]>(
+  const page = Number(searchParams.get('page')) || 1;
+  const pageSize = Number(searchParams.get('perPage')) || 10;
+  const search = searchParams.get('search') || "";
+  const sortBy = searchParams.get('sortBy') || "";
+  
+  const { data: watchersData, refetch: refetchWatchers } = useQuery(getWatchersQuery({ page, pageSize, prefix: search, sortBy }));
+
+  const deleteMutation = useMutation({
+    ...deleteWatcherMutation(),
+    onSuccess: () => {
+      refetchWatchers();
+      toast.success("Watcher deleted successfully");
+    },
+    onError: (error: { message: string; status?: number }) => {
+      if (error.status === 401) {
+        // Token expired, auth interceptor will handle the redirect
+        return;
+      }
+      toast.error(error.message || "Failed to delete watcher");
+    }
+  });
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleDelete = (id: string) => {
+    console.log(id);
+    deleteMutation.mutate(id);
+  };
+
+  const columns = React.useMemo<ColumnDef<Watcher>[]>(
     () => [
       {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={
-              table.getIsAllPageRowsSelected() ||
-              (table.getIsSomePageRowsSelected() && "indeterminate")
-            }
-            onCheckedChange={(value) =>
-              table.toggleAllPageRowsSelected(!!value)
-            }
-            aria-label="Select all"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        ),
-        size: 32,
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
-        id: "name",
-        accessorKey: "name",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        id: "username",
+        accessorKey: "username",
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Name" />
         ),
-        cell: ({ cell }) => <div>{cell.getValue<Project["name"]>()}</div>,
+        cell: ({ cell }) => <div>{cell.getValue<Watcher["username"]>()}</div>,
         meta: {
           label: "Name",
           placeholder: "Search names...",
@@ -123,11 +80,11 @@ const Admin = () => {
       {
         id: "platform",
         accessorKey: "platform",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Platform" />
         ),
         cell: ({ cell }) => {
-          const platform = cell.getValue<Project["platform"]>();
+          const platform = cell.getValue<Watcher["platform"]>();
           const Icon = platform === "youtube" ? SmilePlus : SmileIcon;
  
           return (
@@ -146,29 +103,40 @@ const Admin = () => {
             { label: "Twitter", value: "twitter", icon: SmileIcon },
           ],
         },
-        enableColumnFilter: true,
+        enableColumnFilter: false,
       },
       {
         id: "interaction",
         accessorKey: "interaction",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Interaction" />
         ),
         cell: ({ cell }) => {
-          const interaction = cell.getValue<Project["interaction"]>();
+          const interaction = cell.getValue<Watcher["interaction"]>();
  
           return (
-            <div className="flex items-center gap-1">
-              <StarHalf className="size-4" />
-              {interaction.toLocaleString()}
-            </div>
+            <Badge variant="outline" className="capitalize">
+              {interaction}
+            </Badge>
           );
         },
+        meta: {
+          label: "Interaction",
+          variant: "select",
+          options: [
+            { label: "Comment", value: "comment" },
+            { label: "Tip", value: "tip" },
+            { label: "Subscription", value: "subscription" },
+            { label: "Membership Gift", value: "membershipGift" },
+            { label: "Superchat", value: "superchat" },
+          ],
+        },
         enableSorting: true,
+        enableColumnFilter: true,
       },
       {
         id: "actions",
-        cell: function Cell() {
+        cell: ({ row }) => {
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -178,7 +146,10 @@ const Admin = () => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem variant="destructive">
+                <DropdownMenuItem 
+                  variant="destructive"
+                  onClick={() => handleDelete(row.original.id)}
+                >
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -188,36 +159,91 @@ const Admin = () => {
         size: 32,
       },
     ],
-    [],
+    [handleDelete],
   );
  
   const { table } = useDataTable({
-    data: filteredData,
+    data: watchersData?.data || [],
     columns,
-    pageCount: 1,
-    initialState: {
-      sorting: [{ id: "name", desc: true }],
-      columnPinning: { right: ["actions"] },
-    },
+    pageCount: watchersData?.totalPages || 1,
     getRowId: (row) => row.id,
+    initialState: {
+      pagination: {
+        pageIndex: Number(page) - 1,
+        pageSize: Number(pageSize),
+      },
+      columnFilters: [
+        { id: "username", value: search },
+      ],
+    },
+    history: "replace",
+    shallow: true,
   });
+
+  const tablePagination = table.getState().pagination;
+  const tableColumnFilters = table.getState().columnFilters;
+
+  React.useEffect(() => {
+    const interactionFilter = tableColumnFilters.find(filter => filter.id === "interaction");
+    if (interactionFilter) {
+      console.log("Selected interaction type:", interactionFilter.value);
+    }
+  }, [tableColumnFilters]);
+
+  React.useEffect(() => {
+    const { pageIndex, pageSize } = table.getState().pagination;
+    const { columnFilters } = table.getState();
+    const usernameFilter = columnFilters.find(filter => filter.id === "username");
+    const interactionFilter = columnFilters.find(filter => filter.id === "interaction");
+    const searchValue = usernameFilter?.value as string || "";
+    const sortValue = Array.isArray(interactionFilter?.value) 
+      ? interactionFilter.value[0] 
+      : (interactionFilter?.value as string || "");
+  
+    // Avoid re-setting the same params unnecessarily
+    const currentPage = Number(searchParams.get("page")) || 1;
+    const currentPerPage = Number(searchParams.get("perPage")) || 10;
+    const currentSearch = searchParams.get("search") || "";
+    const currentSort = searchParams.get("sortBy") || "";
+  
+    if (currentPage !== pageIndex + 1 || 
+        currentPerPage !== pageSize || 
+        currentSearch !== searchValue ||
+        currentSort !== sortValue) {
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set("page", String(pageIndex + 1));
+      newParams.set("perPage", String(pageSize));
+      if (searchValue) {
+        newParams.set("search", searchValue);
+      } else {
+        newParams.delete("search");
+      }
+      if (sortValue) {
+        newParams.set("sortBy", sortValue);
+      } else {
+        newParams.delete("sortBy");
+      }
+      navigate({ search: newParams.toString() }, { replace: true });
+    }
+  }, [tablePagination, tableColumnFilters, navigate, searchParams, table]);
+
   return (
     <main className="p-10">
       <div className="flex flex-col md:flex-row justify-between  p-4 gap-4">
         <div className="flex flex-col gap-2">
           <BreadcrumbModal path={["Admin"]} />
           <h1 className="text-2xl font-bold">Admin</h1>
-          <p className="text-sm text-gray-500">This is the admin page</p>
+          <p className="text-sm text-gray-500">Total Users: {watchersData?.totalItems || 0}</p>
         </div>
-        <Button>Export Link <LinkIcon className="w-4 h-4" /></Button>
+        <a className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md h-fit" target="_blank" href={`${server.baseUrl}/dashboard/watchers/plaintext`}>Export Link <LinkIcon className="w-4 h-4" /></a>
       </div>
-        <div className="data-table-container">
-            <DataTable table={table}>
-                <DataTableToolbar table={table} />
-            </DataTable>
-        </div>
+      <div className="data-table-container">
+        <DataTable table={table}>
+          <DataTableToolbar table={table} />
+        </DataTable>
+      </div>
     </main>
-  )
-}
+  );
+};
 
-export default Admin
+export default Admin;
