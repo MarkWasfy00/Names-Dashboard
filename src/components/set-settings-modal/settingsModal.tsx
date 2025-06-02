@@ -5,7 +5,7 @@ import { Input } from '../ui/input'
 const SettingsModal = () => {
   return (
     <Dialog>
-        <DialogTrigger className="bg-green-500 text-white px-4 py-2 rounded-md">connect</DialogTrigger>
+        <DialogTrigger className="bg-green-600 text-white px-4 py-2 rounded-md">connect</DialogTrigger>
         <DialogContent>
             <DialogHeader>
             <DialogTitle>Connect with Streamlabs & Video ID</DialogTitle>

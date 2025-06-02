@@ -19,93 +19,54 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import * as React from "react";
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BreadcrumbModal } from "@/components/breadcrumb-modal/breadcrumbModal";
- 
-interface Project {
+import { auth } from "@/lib/auth";
+import * as signalR from "@microsoft/signalr";
+import { server } from "@/lib/server";
+
+
+type Watcher = {
   id: string;
-  name: string;
-  interaction: string;
+  username: string;
   platform: string;
+  interaction: string;
 }
  
-const data: Project[] = [
-  {
-    id: "1",
-    name: "Mark Wasfy",
-    interaction: "like",
-    platform: "youtube"
-  },
-  {
-    id: "2",
-    name: "John Doe",
-    interaction: "comment",
-    platform: "facebook"
-  },
-  {
-    id: "3",
-    name: "Jane Smith",
-    interaction: "share",
-    platform: "twitter"
-  },
-  {
-    id: "4",
-    name: "Omar Abdelghany",
-    interaction: "comment",
-    platform: "facebook"
-  },
-  {
-    id: "5",
-    name: "Sarah Johnson",
-    interaction: "like",
-    platform: "youtube"
-  },
-  {
-    id: "6",
-    name: "Michael Brown",
-    interaction: "share",
-    platform: "twitter"
-  },
-  {
-    id: "7",
-    name: "Emily Davis",
-    interaction: "comment",
-    platform: "youtube"
-  },
-  {
-    id: "8",
-    name: "David Wilson",
-    interaction: "like",
-    platform: "facebook"
-  },
-  {
-    id: "9",
-    name: "Lisa Anderson",
-    interaction: "share",
-    platform: "youtube"
-  },
-  {
-    id: "10",
-    name: "James Taylor",
-    interaction: "comment",
-    platform: "twitter"
-  }
-];
- 
+
 export default function Home() {
   const [connectionInfo, setConnectionInfo] = useState<boolean>(false);
-  const navigate = useNavigate();
- 
+  const [watchers, setWatchers] = useState<Watcher[]>([]);
+  const [lastAddedWatcher, setLastAddedWatcher] = useState<Watcher | null>(null);
+  const [currentUsers, setCurrentUsers] = useState<number>(0);
+  const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
-  const columns = React.useMemo<ColumnDef<Project>[]>(
+  const navigate = useNavigate();
+
+  const handleSetVideoId = useCallback(async (videoId: string, streamlabsToken: string) => {
+    if (connection) {
+      try {
+        await connection.invoke("SetVideoId", videoId, streamlabsToken);
+      } catch (error) {
+        console.error("Error setting video ID:", error);
+      }
+    }
+  }, [connection]);
+ 
+  const handleLogout = () => {
+    auth.removeToken();
+    navigate('/login', { replace: true });
+  };
+
+  const columns = React.useMemo<ColumnDef<Watcher>[]>(
     () => [
       {
-        id: "name",
-        accessorKey: "name",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        id: "username",
+        accessorKey: "username",
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Name" />
         ),
-        cell: ({ cell }) => <div>{cell.getValue<Project["name"]>()}</div>,
+        cell: ({ cell }) => <div>{cell.getValue<Watcher["username"]>()}</div>,
         meta: {
           label: "Name",
           placeholder: "Search names...",
@@ -117,11 +78,11 @@ export default function Home() {
       {
         id: "platform",
         accessorKey: "platform",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Platform" />
         ),
         cell: ({ cell }) => {
-          const platform = cell.getValue<Project["platform"]>();
+          const platform = cell.getValue<Watcher["platform"]>();
           const Icon = platform === "youtube" ? SmilePlus : SmileIcon;
  
           return (
@@ -145,11 +106,11 @@ export default function Home() {
       {
         id: "interaction",
         accessorKey: "interaction",
-        header: ({ column }: { column: Column<Project, unknown> }) => (
+        header: ({ column }: { column: Column<Watcher, unknown> }) => (
           <DataTableColumnHeader column={column} title="Interaction" />
         ),
         cell: ({ cell }) => {
-          const interaction = cell.getValue<Project["interaction"]>();
+          const interaction = cell.getValue<Watcher["interaction"]>();
  
           return (
             <div className="flex items-center gap-1">
@@ -164,33 +125,79 @@ export default function Home() {
   );
  
   const { table } = useDataTable({
-    data: data,
+    data: watchers,
     columns,
     pageCount: 1,
     
     getRowId: (row) => row.id,
   });
 
-  const handleConnect = () => {
-    
-  }
- 
+  useEffect(() => {
+    const newConnection = new signalR.HubConnectionBuilder()
+      .withUrl(server.websocketUrl, {
+        accessTokenFactory: () => auth.getToken() || ''
+      })
+      .withAutomaticReconnect()
+      .build();
+
+    setConnection(newConnection);
+
+    const startConnection = async () => {
+      try {
+        await newConnection.start();
+        setConnectionInfo(true);
+        await newConnection.invoke("MakeListener");
+      } catch (err) {
+        console.error("Error starting connection:", err);
+        setConnectionInfo(false);
+      }
+    };
+
+    startConnection();
+
+    newConnection.on("UpdateWatchers", (watchers: Watcher[]) => {
+      setWatchers(watchers);
+      setLastAddedWatcher(watchers[watchers.length - 1] || null);
+      setCurrentUsers(watchers.length);
+    });
+
+    newConnection.onreconnecting(() => {
+      setConnectionInfo(false);
+    });
+
+    newConnection.onreconnected(() => {
+      setConnectionInfo(true);
+      newConnection.invoke("MakeListener").catch(console.error);
+    });
+
+    newConnection.onclose(() => {
+      setConnectionInfo(false);
+    });
+
+    return () => {
+      if (newConnection) {
+        newConnection.stop().catch(console.error);
+      }
+    };
+  }, []);
+  
   return (
     <main className="p-10">
 
-      <div className="flex flex-col md:flex-row justify-between  p-4 gap-4">
+      <div className="flex flex-col md:flex-row justify-between  bg-gray-100 rounded-md p-4 gap-4 mb-4">
         <div className="flex flex-col gap-2">
             <Button onClick={() => navigate("/admin")}><ShieldUser className="w-4 h-4" /></Button>
-            <Button><LogOut className="w-4 h-4" /></Button>
+            <Button onClick={handleLogout}><LogOut className="w-4 h-4" /></Button>
         </div>
         <div className="flex flex-col gap-2">
             <BreadcrumbModal path={[]} />
           <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-gray-500">This is the home page</p>
+          <p className="flex items-center gap-2 text-sm text-gray-500">connection info : <Cable className={`w-4 h-4 ${connectionInfo ? "text-green-500" : "text-red-500"}`} /> </p>
+          <p className="text-sm text-gray-500">last added user : {lastAddedWatcher?.username}</p>
+          <p className="text-sm text-gray-500">current users : {currentUsers}</p>
         </div>
 
-        <div className="flex flex-col gap-2 ml-auto w-fit bg-gray-100 rounded-md p-4 ">
-          <p className="flex items-center gap-2">connection info : <Cable className={`w-4 h-4 ${connectionInfo ? "text-green-500" : "text-red-500"}`} /> </p>
+        <div className="flex flex-col gap-2 ml-auto w-fit rounded-md p-4 ">
           <p>video id : <span className="font-bold">1234567890</span></p>
           <p>streamlabs id : <span className="font-bold">1234567890</span></p>
           {
@@ -202,6 +209,8 @@ export default function Home() {
         <div className="data-table-container">
             <DataTable table={table}/>
         </div>
+
+        <Button onClick={() => handleSetVideoId("jfKfPfyJRdk", "11")}>set video id</Button>
     </main>
   );
 }

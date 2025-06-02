@@ -7,8 +7,7 @@ interface LoginQueryProps {
 }
 
 interface LoginResponse {
-    accessToken: string;
-    refreshToken: string;
+    token: string;
 }
 
 interface LoginError {

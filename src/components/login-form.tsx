@@ -13,7 +13,7 @@ import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { useLoginMutation } from "@/queries/login/LoginQuery"
 import { toast } from "sonner"
-import { useNavigate } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 import { auth } from "@/lib/auth"
 
 export function LoginForm({
@@ -24,15 +24,19 @@ export function LoginForm({
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
   const { mutateAsync, isPending } = useMutation({ mutationFn: useLoginMutation })
 
   const handleLogin = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
     try {
       const response = await mutateAsync({ username, password })
-      auth.setToken(response.accessToken)
+      auth.setToken(response.token)
       toast.success('Login successful')
-      navigate('/', { replace: true })
+      
+      // Get the redirect path from location state or default to home
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/'
+      navigate(from, { replace: true })
     } catch (error: unknown) {
       console.error(error)
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'

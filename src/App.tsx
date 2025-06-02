@@ -12,13 +12,17 @@ import { Toaster } from "@/components/ui/sonner"
 import Home from "./pages/home/Home";
 import { NuqsAdapter } from 'nuqs/adapters/react-router/v7'
 import Admin from "./pages/admin/Admin";
-
+import { ProtectedRoute } from "./components/protected-route";
 
 const queryClient = new QueryClient()
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Home />,
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/login",
@@ -26,7 +30,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    element: <Admin />,
+    element: (
+      <ProtectedRoute>
+        <Admin />
+      </ProtectedRoute>
+    ),
   },
 ]);
 
