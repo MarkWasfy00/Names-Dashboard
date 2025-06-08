@@ -27,10 +27,12 @@ import { getWatchersQuery, deleteWatcherMutation, type Watcher } from "@/queries
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { server } from "@/lib/server";
 import { toast } from "sonner";
+import { useState } from "react";
 
 const Admin = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [isExporting, setIsExporting] = useState(false);
 
   const page = Number(searchParams.get('page')) || 1;
   const pageSize = Number(searchParams.get('perPage')) || 10;
@@ -56,7 +58,6 @@ const Admin = () => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleDelete = (id: string) => {
-    console.log(id);
     deleteMutation.mutate(id);
   };
 
@@ -235,7 +236,26 @@ const Admin = () => {
           <h1 className="text-2xl font-bold">Admin</h1>
           <p className="text-sm text-gray-500">Total Users: {watchersData?.totalItems || 0}</p>
         </div>
-        <a className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md h-fit" target="_blank" href={`${server.baseUrl}/dashboard/watchers/plaintext`}>Export Link <LinkIcon className="w-4 h-4" /></a>
+        <button 
+          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md h-fit disabled:opacity-50" 
+          onClick={async () => {
+            try {
+              setIsExporting(true);
+              const response = await fetch(`${server.baseUrl}/dashboard/watchers/plaintext`);
+              const text = await response.text();
+              await navigator.clipboard.writeText(text);
+              toast.success("Export data copied to clipboard");
+            } catch (error: unknown) {
+              console.error('Export error:', error);
+              toast.error("Failed to copy export data");
+            } finally {
+              setIsExporting(false);
+            }
+          }}
+          disabled={isExporting}
+        >
+          {isExporting ? "Copying..." : "Export Link"} <LinkIcon className="w-4 h-4" />
+        </button>
       </div>
       <div className="data-table-container">
         <DataTable table={table}>
