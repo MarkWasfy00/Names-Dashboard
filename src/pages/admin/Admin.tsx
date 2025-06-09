@@ -19,11 +19,12 @@ import {
   SmileIcon,
   SmilePlus,
   Text,
+  Trash2,
 } from "lucide-react";
 import * as React from "react";
 import { useSearchParams, useNavigate } from "react-router";
 import { BreadcrumbModal } from "@/components/breadcrumb-modal/breadcrumbModal";
-import { getWatchersQuery, deleteWatcherMutation, type Watcher } from "@/queries/watchers/WatcherQuery";
+import { getWatchersQuery, deleteWatcherMutation, deleteAllWatchersMutation, type Watcher } from "@/queries/watchers/WatcherQuery";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { server } from "@/lib/server";
 import { toast } from "sonner";
@@ -56,9 +57,30 @@ const Admin = () => {
     }
   });
 
+  const deleteAllMutation = useMutation({
+    ...deleteAllWatchersMutation(),
+    onSuccess: () => {
+      refetchWatchers();
+      toast.success("All watchers deleted successfully");
+    },
+    onError: (error: { message: string; status?: number }) => {
+      if (error.status === 401) {
+        // Token expired, auth interceptor will handle the redirect
+        return;
+      }
+      toast.error(error.message || "Failed to delete all watchers");
+    }
+  });
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  const handleDeleteAll = () => {
+    if (window.confirm("Are you sure you want to delete all watchers? This action cannot be undone.")) {
+      deleteAllMutation.mutate();
+    }
   };
 
   const columns = React.useMemo<ColumnDef<Watcher>[]>(
@@ -236,26 +258,35 @@ const Admin = () => {
           <h1 className="text-2xl font-bold">Admin</h1>
           <p className="text-sm text-gray-500">Total Users: {watchersData?.totalItems || 0}</p>
         </div>
-        <button 
-          className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md h-fit disabled:opacity-50" 
-          onClick={async () => {
-            try {
-              setIsExporting(true);
-              const response = await fetch(`${server.baseUrl}/dashboard/watchers/plaintext`);
-              const text = await response.text();
-              await navigator.clipboard.writeText(text);
-              toast.success("Export data copied to clipboard");
-            } catch (error: unknown) {
-              console.error('Export error:', error);
-              toast.error("Failed to copy export data");
-            } finally {
-              setIsExporting(false);
-            }
-          }}
-          disabled={isExporting}
-        >
-          {isExporting ? "Copying..." : "Export Link"} <LinkIcon className="w-4 h-4" />
-        </button>
+        <div className="flex gap-2">
+          <button 
+            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-md h-fit disabled:opacity-50" 
+            onClick={handleDeleteAll}
+            disabled={deleteAllMutation.isPending}
+          >
+            {deleteAllMutation.isPending ? "Deleting..." : "Delete All"} <Trash2 className="w-4 h-4" />
+          </button>
+          <button 
+            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-md h-fit disabled:opacity-50" 
+            onClick={async () => {
+              try {
+                setIsExporting(true);
+                const response = await fetch(`${server.baseUrl}/dashboard/watchers/plaintext`);
+                const text = await response.text();
+                await navigator.clipboard.writeText(text);
+                toast.success("Export data copied to clipboard");
+              } catch (error: unknown) {
+                console.error('Export error:', error);
+                toast.error("Failed to copy export data");
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            disabled={isExporting}
+          >
+            {isExporting ? "Copying..." : "Export Link"} <LinkIcon className="w-4 h-4" />
+          </button>
+        </div>
       </div>
       <div className="data-table-container">
         <DataTable table={table}>

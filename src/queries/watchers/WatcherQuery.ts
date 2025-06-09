@@ -68,3 +68,26 @@ export const deleteWatcherMutation = () => {
         }
     };
 };
+
+export const deleteAllWatchersMutation = () => {
+    return {
+        mutationFn: async () => {
+            try {
+                await api.delete('/dashboard/watchers');
+            } catch (error) {
+                console.log(error);
+                if (error instanceof AxiosError) {
+                    const watcherError: WatcherError = {
+                        message: error.response?.data?.message || 'No watchers found to delete.', 
+                        status: error.response?.status || 500
+                    };
+                    throw watcherError;
+                }
+                throw {
+                    message: 'An unexpected error occurred',
+                    status: 500
+                };
+            }
+        }
+    };
+};
