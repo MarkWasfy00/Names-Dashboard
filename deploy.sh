@@ -24,7 +24,7 @@ echo "🚀 Starting deployment process..."
 
 # Step 1: Clean the target directory
 echo "🗑️  Cleaning /var/www/frontend..."
-rm -rf /var/www/frontend/* &
+sudo rm -rf /var/www/frontend/* &
 show_loading $!
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Clean completed${NC}"
@@ -46,7 +46,7 @@ fi
 
 # Step 3: Copy dist contents
 echo "📦 Copying files to /var/www/frontend..."
-cp -r ./dist/* /var/www/frontend/ &
+sudo cp -r ./dist/* /var/www/frontend/ &
 show_loading $!
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Copy completed${NC}"
