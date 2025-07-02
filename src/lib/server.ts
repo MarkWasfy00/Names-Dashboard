@@ -1,4 +1,4 @@
 export const server = {
-    baseUrl: "https://yttraffic.com/api",
-    websocketUrl: "https://yttraffic.com/youtubechathub",
+    baseUrl: "http://139.59.145.106:5050/api",
+    websocketUrl: "http://139.59.145.106:5050/youtubechathub",
 }

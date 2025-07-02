@@ -273,8 +273,16 @@ const Admin = () => {
                 setIsExporting(true);
                 const response = await fetch(`${server.baseUrl}/dashboard/watchers/plaintext`);
                 const text = await response.text();
-                await navigator.clipboard.writeText(text);
-                toast.success("Export data copied to clipboard");
+                // await navigator.clipboard.writeText(text);
+                toast("Export data copied to clipboard", {
+                  description: text,
+                  action: {
+                    label: "Copy",
+                    onClick: () => {
+                      navigator.clipboard.writeText(text);
+                    }
+                  }
+                });
               } catch (error: unknown) {
                 console.error('Export error:', error);
                 toast.error("Failed to copy export data");
